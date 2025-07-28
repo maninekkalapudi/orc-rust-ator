@@ -1,0 +1,83 @@
+# This file defines the static list of all jobs and their tasks for the orchestrator.
+# The `init` command reads this file to seed the metadata database.
+
+- # --- Job 1: A scheduled job to fetch API data daily ---
+  job_id: "daily_posts_from_api"
+  description: "Fetches posts from the JSONPlaceholder API and loads them into DuckDB every night."
+  # This is a standard cron string: "At 02:00 (2 AM) every day."
+  schedule: "0 0 2 * * *"
+  is_active: true
+  tasks:
+    - task_id: "extract_and_load_api_posts"
+      task_order: 1 # This is the first and only task for this job.
+      extractor_config:
+        # Corresponds to the `Api` variant in your `ExtractorConfig` enum
+        type: "api"
+        url: "https://jsonplaceholder.typicode.com/posts"
+      loader_config:
+        # Corresponds to the `DuckDB` variant in your `LoaderConfig` enum
+        type: "duckdb"
+        db_path: "data_warehouse.db" # The final destination for your data
+        table_name: "raw_api_posts"
+
+
+- # --- Job 2: A manually triggered job to process a local file ---
+  job_id: "process_users_csv"
+  description: "Processes a local user CSV file when triggered manually."
+  # "@manual" is a special keyword we handle in our scheduler to prevent automatic runs.
+  # This job must be triggered via a direct API call or a future CLI command.
+  schedule: "@manual"
+  is_active: true
+  tasks:
+    - task_id: "extract_and_load_users_csv"
+      task_order: 1
+      extractor_config:
+        type: "csv"
+        # IMPORTANT: Make sure you have a `data` folder with this file inside it.
+        # The path is relative to where you run the `cargo run` command.
+        path: "./data/users.csv"
+      loader_config:
+        type: "duckdb"
+        db_path: "data_warehouse.db"
+        table_name: "raw_csv_users"
+
+- # --- Job 3: An example of a multi-step job (currently inactive) ---
+  job_id: "multi_step_etl"
+  description: "An example job with multiple sequential tasks."
+  schedule: "0 0 4 * * 1" # Runs at 4:00 AM every Monday
+  is_active: false # This job will be ignored by the scheduler until set to true.
+  tasks:
+    - task_id: "step1_fetch_comments"
+      task_order: 1 # This task runs first.
+      extractor_config:
+        type: "api"
+        url: "https://jsonplaceholder.typicode.com/comments"
+      loader_config:
+        type: "duckdb"
+        db_path: "data_warehouse.db"
+        table_name: "raw_api_comments"
+    - task_id: "step2_fetch_albums"
+      task_order: 2 # This task runs second, after the first one succeeds.
+      extractor_config:
+        type: "api"
+        url: "https://jsonplaceholder.typicode.com/albums"
+      loader_config:
+        type: "duckdb"
+        db_path: "data_warehouse.db"
+        table_name: "raw_api_albums"
+
+- # --- Job 4: Electric Vehicle Population Data - State Of Washington ---
+  job_id: "electric_vehicle_population_data"
+  description: "This job loads the Battery Electric Vehicles (BEVs) and Plug-in Hybrid Electric Vehicles (PHEVs) that are currently registered through Washington State Department of Licensing (DOL)."
+  schedule: "0 0 4 * * 1" # Runs at 4:00 AM every Monday
+  is_active: true # This job will be ignored by the scheduler until set to true.
+  tasks:
+    - task_id: "washington_ev_csv_data"
+      task_order: 1 # This task runs first.
+      extractor_config:
+        type: "csv"
+        path: "/path/to/data.csv"
+      loader_config:
+        type: "duckdb"
+        db_path: "data_warehouse.db"
+        table_name: "washington_ev_population"
