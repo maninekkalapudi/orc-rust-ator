@@ -3,7 +3,7 @@
 use crate::pipelines::Loader;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use duckdb::{Connection, params};
+use duckdb::{params, Connection};
 use polars::prelude::*;
 use std::fs::File;
 use tempfile::NamedTempFile;
@@ -25,14 +25,17 @@ impl Loader for DuckDBLoader {
         );
 
         // --- Step 1: Create a temporary file to act as the bridge ---
-        let temp_file = NamedTempFile::new()
-            .context("Failed to create a temporary file for the IPC bridge")?;
-        let temp_file_path = temp_file.path().to_str()
+        let temp_file =
+            NamedTempFile::new().context("Failed to create a temporary file for the IPC bridge")?;
+        let temp_file_path = temp_file
+            .path()
+            .to_str()
             .ok_or_else(|| anyhow::anyhow!("Temporary file path is not valid UTF-8"))?;
 
         // Create a proper file handle for the writer.
-        let file = File::create(temp_file_path)
-            .with_context(|| format!("Failed to create file handle for temp path: {temp_file_path}"))?;
+        let file = File::create(temp_file_path).with_context(|| {
+            format!("Failed to create file handle for temp path: {temp_file_path}")
+        })?;
 
         // --- Step 2: Write the Polars DataFrame to the temp file using IPC format ---
         info!(temp_path = %temp_file_path, "Writing DataFrame to temporary IPC file.");
@@ -58,9 +61,7 @@ impl Loader for DuckDBLoader {
         // Check what arrow functions are available
         let check_functions_query = "SELECT function_name FROM duckdb_functions() WHERE function_name LIKE '%arrow%' OR function_name LIKE '%ipc%';";
         if let Ok(mut stmt) = conn.prepare(check_functions_query) {
-            if let Ok(rows) = stmt.query_map([], |row| {
-                Ok(row.get::<_, String>(0)?)
-            }) {
+            if let Ok(rows) = stmt.query_map([], |row| Ok(row.get::<_, String>(0)?)) {
                 info!("Available Arrow/IPC functions:");
                 for row in rows {
                     if let Ok(function_name) = row {
@@ -71,12 +72,7 @@ impl Loader for DuckDBLoader {
         }
 
         // Try different possible function names for reading IPC files
-        let possible_functions = vec![
-            "read_ipc",
-            "arrow_scan",
-            "read_arrow",
-            "arrow_ipc_scan"
-        ];
+        let possible_functions = vec!["read_ipc", "arrow_scan", "read_arrow", "arrow_ipc_scan"];
 
         let mut success = false;
         for func_name in possible_functions {
@@ -114,3 +110,4 @@ impl Loader for DuckDBLoader {
         Ok(())
     }
 }
+
