@@ -22,7 +22,8 @@ pub enum ExtractorConfig {
     Csv { path: String },
     #[serde(rename = "api")]
     Api { url: String },
-    // Add other extractors here
+    #[serde(rename = "parquet")]
+    Parquet { path: String },
 }
 
 #[derive(Debug, Serialize, Deserialize)]

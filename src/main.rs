@@ -1,32 +1,30 @@
 // In src/main.rs
 
-
 // --- Imports ---
 use anyhow::{Context, Result};
 use chrono::Utc;
 use cron::Schedule;
 use duckdb::Connection;
+use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{error, info};
-use std::process;
 
 // --- Module Declarations ---
 mod config;
+mod extractors;
 mod job_def;
+mod loaders;
 mod logger;
 mod metadata;
 mod pipelines;
-mod extractors;
-mod loaders;
 
 // --- Local Imports ---
 use crate::config::{ExtractorConfig, LoaderConfig};
 // Cleaned up imports for better style
-use crate::extractors::prelude::{ApiExtractor, CsvExtractor};
+use crate::extractors::prelude::{ApiExtractor, CsvExtractor, ParquetExtractor};
 use crate::loaders::prelude::DuckDBLoader;
 use crate::pipelines::{Extractor, Loader};
-
 
 fn format_error_chain(e: &anyhow::Error) -> String {
     e.chain()
@@ -34,7 +32,6 @@ fn format_error_chain(e: &anyhow::Error) -> String {
         .collect::<Vec<String>>()
         .join(" -> ") // Join causes with an arrow for readability
 }
-
 
 // --- Main Application Entry Point ---
 
@@ -72,13 +69,18 @@ async fn main() -> Result<()> {
         "run_job" => {
             info!("--- Running Manual Job Trigger ---");
             if let Some(job_id) = args.get(2) {
-                info!(job_id, "Attempting to run job directly with metadata tracking.");
+                info!(
+                    job_id,
+                    "Attempting to run job directly with metadata tracking."
+                );
 
                 // --- FULL IMPLEMENTATION FOR MANUAL RUNS ---
 
                 // 1. Create a "MANUAL" run record in the database.
-                let run_id = metadata::queue_job_run(&conn, job_id, "MANUAL")
-                    .with_context(|| format!("Failed to create a manual run record for job '{job_id}'"))?;
+                let run_id =
+                    metadata::queue_job_run(&conn, job_id, "MANUAL").with_context(|| {
+                        format!("Failed to create a manual run record for job '{job_id}'")
+                    })?;
                 info!(%run_id, job_id, "Created manual run record.");
 
                 // 2. Immediately update the status to 'RUNNING'.
@@ -132,18 +134,22 @@ async fn main() -> Result<()> {
             println!("  init                - Initialize the metadata database from jobs.yaml. Run this first.");
             println!("  run_job <job_id>    - Manually run a specific job by its ID, bypassing the scheduler."); // <-- NEW HELP TEXT
             println!("  scheduler           - Checks for due jobs and queues them to run.");
-            println!("  run_worker          - Picks up and executes one queued job from the queue.");
+            println!(
+                "  run_worker          - Picks up and executes one queued job from the queue."
+            );
             println!("  help                - Shows this help message.");
         }
         _ => {
             // Use structured logging for better machine-readability
-            error!(command, "Unknown command. Use 'help' for a list of commands.");
+            error!(
+                command,
+                "Unknown command. Use 'help' for a list of commands."
+            );
         }
     }
 
     Ok(())
 }
-
 
 // --- Orchestrator Logic: Scheduler ---
 
@@ -160,8 +166,12 @@ async fn run_scheduler(conn: &Connection) -> Result<()> {
         if job.schedule == "@manual" {
             continue;
         }
-        let schedule = Schedule::from_str(&job.schedule)
-            .with_context(|| format!("Invalid cron schedule for job '{}': {}", job.job_id, job.schedule))?;
+        let schedule = Schedule::from_str(&job.schedule).with_context(|| {
+            format!(
+                "Invalid cron schedule for job '{}': {}",
+                job.job_id, job.schedule
+            )
+        })?;
 
         if let Some(next_run) = schedule.upcoming(Utc).next() {
             if next_run <= now {
@@ -172,7 +182,6 @@ async fn run_scheduler(conn: &Connection) -> Result<()> {
     }
     Ok(())
 }
-
 
 // --- Orchestrator Logic: Worker ---
 
@@ -211,22 +220,32 @@ async fn execute_job(conn: &Connection, job_id: &str) -> Result<()> {
             ExtractorConfig::Csv { path } => Arc::new(CsvExtractor { path }),
             // Pass the url to ApiExtractor
             ExtractorConfig::Api { url } => Arc::new(ApiExtractor { url }),
+            // Pass the path to ParquetExtractor
+            ExtractorConfig::Parquet { path } => Arc::new(ParquetExtractor { path }),
         };
 
         let loader: Arc<dyn Loader + Send + Sync> = match task.loader_config {
-            LoaderConfig::DuckDB { db_path, table_name } => {
-                Arc::new(DuckDBLoader { db_path, table_name })
-            }
+            LoaderConfig::DuckDB {
+                db_path,
+                table_name,
+            } => Arc::new(DuckDBLoader {
+                db_path,
+                table_name,
+            }),
         };
 
         // 1. EXTRACT the data into a DataFrame.
         info!(task_id = %task.task_id, "Extracting data from source...");
-        let df = extractor.extract().await
+        let df = extractor
+            .extract()
+            .await
             .with_context(|| format!("Extraction failed for task '{}'", task.task_id))?;
 
         // 2. LOAD the DataFrame into the destination.
         info!(task_id = %task.task_id, "Loading data into destination...");
-        loader.load(df).await
+        loader
+            .load(df)
+            .await
             .with_context(|| format!("Loading failed for task '{}'", task.task_id))?;
 
         info!(task_id = %task.task_id, "Task completed successfully.");

@@ -20,7 +20,6 @@
         db_path: "data_warehouse.db" # The final destination for your data
         table_name: "raw_api_posts"
 
-
 - # --- Job 2: A manually triggered job to process a local file ---
   job_id: "process_users_csv"
   description: "Processes a local user CSV file when triggered manually."
@@ -44,7 +43,7 @@
 - # --- Job 3: An example of a multi-step job (currently inactive) ---
   job_id: "multi_step_etl"
   description: "An example job with multiple sequential tasks."
-  schedule: "0 0 4 * * 1" # Runs at 4:00 AM every Monday
+  schedule: "@manual" # Runs at 4:00 AM every Monday
   is_active: false # This job will be ignored by the scheduler until set to true.
   tasks:
     - task_id: "step1_fetch_comments"
@@ -66,18 +65,18 @@
         db_path: "data_warehouse.db"
         table_name: "raw_api_albums"
 
-- # --- Job 4: Electric Vehicle Population Data - State Of Washington ---
-  job_id: "electric_vehicle_population_data"
-  description: "This job loads the Battery Electric Vehicles (BEVs) and Plug-in Hybrid Electric Vehicles (PHEVs) that are currently registered through Washington State Department of Licensing (DOL)."
+- # --- Job 4: NYC High Volume For-Hire Vehicle Trip Records ---
+  job_id: "nyc_high_volume_forhire_vehicle_trip_data"
+  description: "NYC Yellow, Green, and High Volume FHV dataset"
   schedule: "0 0 4 * * 1" # Runs at 4:00 AM every Monday
   is_active: true # This job will be ignored by the scheduler until set to true.
   tasks:
     - task_id: "washington_ev_csv_data"
       task_order: 1 # This task runs first.
       extractor_config:
-        type: "csv"
-        path: "/path/to/data.csv"
+        type: "parquet"
+        path: "/path/to/parquet"
       loader_config:
         type: "duckdb"
         db_path: "data_warehouse.db"
-        table_name: "washington_ev_population"
+        table_name: "nyc_fhvhv_tripdata"

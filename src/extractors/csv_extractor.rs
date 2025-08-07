@@ -18,7 +18,6 @@ impl Extractor for CsvExtractor {
         // Clone the path so it can be moved into the blocking thread.
         let path_clone = self.path.clone();
 
-        // --- THE FIX IS HERE ---
         // We move the entire blocking Polars operation into a dedicated thread.
         let df = tokio::task::spawn_blocking(move || {
             LazyCsvReader::new(path_clone)
@@ -27,10 +26,11 @@ impl Extractor for CsvExtractor {
                 .finish()?
                 .collect()
         })
-            .await? // The first `await` waits for the thread to finish.
-            .with_context(|| format!("Failed to read or parse CSV file at '{}'", self.path))?; // The second `?` handles the inner Polars Result.
+        .await? // The first `await` waits for the thread to finish.
+        .with_context(|| format!("Failed to read or parse CSV file at '{}'", self.path))?; // The second `?` handles the inner Polars Result.
 
         info!(path = %self.path, rows = df.height(), "CSV data extracted successfully.");
         Ok(df)
     }
 }
+
