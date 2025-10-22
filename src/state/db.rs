@@ -174,7 +174,7 @@ impl Db {
 
     pub async fn get_queued_job_run(&self) -> Result<Option<JobRun>> {
         let run = sqlx::query_as::<_, JobRun>(
-            "SELECT * FROM job_runs WHERE status = \"queued\" ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED "
+            "SELECT * FROM job_runs WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED "
         )
         .fetch_optional(match &self.pool { DbPool::Pg(pool) => pool })
         .await?;

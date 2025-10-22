@@ -60,7 +60,7 @@ pub async fn run_app() -> Result<()> {
         .with_state(db);
 
     // Run the API server
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     info!("API server listening on {}", addr);
     axum::serve(tokio::net::TcpListener::bind(&addr).await?, app)
         .await

@@ -15,6 +15,8 @@ use axum::{
 use serde::Deserialize;
 use serde_json::Value;
 
+use tracing::{info, error}; // Added tracing imports
+
 // --- Job Handlers ---
 
 #[derive(Deserialize)]
@@ -36,6 +38,8 @@ pub async fn create_job(
     State(db): State<Db>,
     Json(payload): Json<CreateJobRequest>,
 ) -> Result<Json<Value>, StatusCode> {
+    info!("Received request to create job: {}", payload.job_name);
+
     let job_manager = JobManager::new(db);
     let tasks = payload
         .tasks
@@ -55,55 +59,85 @@ pub async fn create_job(
             tasks,
         )
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to create job {}: {:?}", payload.job_name, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
+    info!("Successfully created job: {}", job.job_name);
     Ok(Json(serde_json::to_value(job).unwrap()))
 }
 
 pub async fn get_jobs(State(db): State<Db>) -> Result<Json<Value>, StatusCode> {
+    info!("Received request to get all jobs.");
     let jobs = db
         .get_all_job_definitions()
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to get all jobs: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    info!("Successfully retrieved all jobs.");
     Ok(Json(serde_json::to_value(jobs).unwrap()))
 }
 
 pub async fn get_job(State(db): State<Db>, Path(job_id): Path<String>) -> Result<Json<Value>, StatusCode> {
+    info!("Received request to get job: {}", job_id);
     let job_manager = JobManager::new(db);
     let job = job_manager
-        .get_job(job_id)
+        .get_job(job_id.clone()) // Clone job_id for logging
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to get job {}: {:?}", job_id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    info!("Successfully retrieved job: {}", job_id);
     Ok(Json(serde_json::to_value(job).unwrap()))
 }
 
 pub async fn run_job(State(db): State<Db>, Path(job_id): Path<String>) -> Result<StatusCode, StatusCode> {
-    db.create_job_run(job_id, "queued", "manual")
+    info!("Received request to run job: {}", job_id);
+    db.create_job_run(job_id.clone(), "queued", "manual") // Clone job_id for logging
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to run job {}: {:?}", job_id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    info!("Successfully queued job run for job: {}", job_id);
     Ok(StatusCode::OK)
 }
 
 // --- Run Handlers ---
 
 pub async fn get_runs(State(db): State<Db>) -> Result<Json<Value>, StatusCode> {
+    info!("Received request to get all job runs.");
     // This is a simplified implementation. In a real application, you would want to add pagination.
     let runs = db
         .get_all_job_runs()
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to get all job runs: {:?}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    info!("Successfully retrieved all job runs.");
     Ok(Json(serde_json::to_value(runs).unwrap()))
 }
 
 pub async fn get_run(State(db): State<Db>, Path(run_id): Path<String>) -> Result<Json<Value>, StatusCode> {
+    info!("Received request to get job run: {}", run_id);
     let run = db
-        .get_job_run(run_id)
+        .get_job_run(run_id.clone()) // Clone run_id for logging
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            error!("Failed to get job run {}: {:?}", run_id, e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    info!("Successfully retrieved job run: {}", run_id);
     Ok(Json(serde_json::to_value(run).unwrap()))
 }
 
 pub async fn health_check() -> Result<StatusCode, StatusCode> {
+    tracing::info!("Health check requested.");
     Ok(StatusCode::OK)
 }
 

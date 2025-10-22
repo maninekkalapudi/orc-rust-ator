@@ -16,6 +16,12 @@ A robust and scalable Rust-based ELT (Extract, Load, Transform) job orchestrator
 *   **Database-Backed State:** Persistent storage for job definitions, task configurations, and run history.
 *   **Error Handling & Retries:** Built-in mechanisms for resilient task execution.
 
+## Observability
+
+The `orc-rust-ator` application provides comprehensive logging to help monitor its behavior, diagnose issues, and understand the flow of jobs and tasks. Key interactions, such as API requests, job scheduling, task execution, and database operations, are logged with relevant details.
+
+Logs are structured and can be configured via the `RUST_LOG` environment variable (e.g., `RUST_LOG=info` for informational messages, `RUST_LOG=debug` for more detailed debugging).
+
 ## Architecture
 
 The `orc-rust-ator` system is composed of several key components:

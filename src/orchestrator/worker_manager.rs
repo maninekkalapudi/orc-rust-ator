@@ -5,7 +5,7 @@
 
 use crate::state::db::Db;
 use crate::worker::run_worker;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, debug};
@@ -23,11 +23,13 @@ impl WorkerManager {
         info!("WorkerManager started.");
         loop {
             debug!("WorkerManager: Checking for queued job runs...");
-            if let Some(job_run) = self.db.get_queued_job_run().await? {
+            let job_run_option = self.db.get_queued_job_run().await.context("WorkerManager: Failed to get queued job run")?;
+            if let Some(job_run) = job_run_option {
                 info!("WorkerManager: Found queued job run: {}", job_run.run_id);
                 self.db
                     .update_job_run_status(job_run.run_id.clone(), "running")
-                    .await?;
+                    .await
+                    .context(format!("WorkerManager: Failed to update job run {} status to 'running'", job_run.run_id))?;
                 info!("WorkerManager: Job run {} status set to 'running'.", job_run.run_id);
 
                 let db_clone = self.db.clone();

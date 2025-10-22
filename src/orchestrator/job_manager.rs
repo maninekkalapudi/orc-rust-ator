@@ -6,8 +6,10 @@
 //! functionality for job definitions and their tasks, interacting directly with the database.
 
 use crate::state::db::{Db, JobDefinition, TaskDefinition};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde_json::Value;
+
+use tracing::{info, error}; // Added tracing imports
 
 pub struct JobManager {
     db: Db,
@@ -26,12 +28,17 @@ impl JobManager {
         is_active: bool,
         tasks: Vec<NewTask>,
     ) -> Result<JobDefinition> {
+        info!("JobManager: Creating job definition for '{}'", job_name);
         let job = self
             .db
             .create_job_definition(job_name, description, schedule, is_active)
-            .await?;
+            .await
+            .context(format!("Failed to create job definition for '{}'", job_name))?;
+
+        info!("JobManager: Job definition '{}' created with ID: {}", job_name, job.job_id);
 
         for (i, task) in tasks.into_iter().enumerate() {
+            info!("JobManager: Creating task {} for job '{}'", i + 1, job.job_id);
             self.db
                 .create_task_definition(
                     job.job_id.clone(),
@@ -39,21 +46,27 @@ impl JobManager {
                     &task.extractor_config,
                     &task.loader_config,
                 )
-                .await?;
+                .await
+                .context(format!("Failed to create task {} for job '{}'", i + 1, job.job_id))?;
+            info!("JobManager: Task {} for job '{}' created.", i + 1, job.job_id);
         }
 
+        info!("JobManager: Successfully created job '{}' with all tasks.", job_name);
         Ok(job)
     }
 
     pub async fn get_job(&self, job_id: String) -> Result<Option<(JobDefinition, Vec<TaskDefinition>)>> {
-        if let Some(job) = self.db.get_job_definition(job_id).await? {
-            let tasks = self.db.get_task_definitions_for_job(job.job_id.clone()).await?;
+        info!("JobManager: Attempting to retrieve job with ID: {}", job_id);
+        if let Some(job) = self.db.get_job_definition(job_id.clone()).await.context(format!("Failed to get job definition for ID: {}", job_id))? {
+            info!("JobManager: Job with ID {} found. Retrieving tasks.", job_id);
+            let tasks = self.db.get_task_definitions_for_job(job.job_id.clone()).await.context(format!("Failed to get task definitions for job ID: {}", job_id))?;
+            info!("JobManager: Successfully retrieved job {} and its tasks.", job_id);
             Ok(Some((job, tasks)))
         } else {
+            info!("JobManager: Job with ID {} not found.", job_id);
             Ok(None)
         }
-    }
-}
+    }}
 
 pub struct NewTask {
     pub extractor_config: Value,

@@ -4,7 +4,7 @@
 //! and creates `JobRun` entries in the database for the `WorkerManager` to pick up.
 
 use crate::state::db::Db;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use cron::Schedule;
 use chrono::Utc;
 use std::str::FromStr;
@@ -34,38 +34,46 @@ impl Scheduler {
     }
 
     async fn check_and_schedule_jobs(&self) -> Result<()> {
-        let jobs = self.db.get_all_job_definitions().await?;
+        let jobs = self.db.get_all_job_definitions().await.context("Scheduler: Failed to get all job definitions")?;
 
         for job in jobs {
             if !job.is_active {
-                debug!("Job {} is inactive, skipping.", job.job_id);
+                debug!("Scheduler: Job {} is inactive, skipping.", job.job_id);
                 continue;
             }
 
-            let schedule = Schedule::from_str(&job.schedule)?;
+            let schedule = match Schedule::from_str(&job.schedule) {
+                Ok(s) => s,
+                Err(e) => {
+                    error!("Scheduler: Failed to parse schedule for job {}: {:?}", job.job_id, e);
+                    continue; // Skip this job if schedule is invalid
+                }
+            };
             let now = chrono::Utc::now();
 
             // Check if the job is due
             if let Some(next_due) = schedule.upcoming(Utc).next() {
                 if next_due <= now {
-                    // Check if a run for this schedule has already been created
-                    // This is a simplified check. A more robust solution would involve
-                    // storing the last scheduled time or a run ID associated with the schedule.
-                    let last_run = self.db.get_last_job_run(job.job_id.clone()).await?;
+                    let last_run = self.db.get_last_job_run(job.job_id.clone()).await.context(format!("Scheduler: Failed to get last run for job {}", job.job_id))?;
                     let should_schedule = match last_run {
                         Some(run) => {
-                            // Only schedule if the last run was before the current due time
-                            // or if it failed and needs a retry (logic to be refined)
-                            run.created_at < next_due
+                            if run.created_at < next_due {
+                                true
+                            } else {
+                                debug!("Scheduler: Job {} is due but already has a recent run. Skipping.", job.job_id);
+                                false
+                            }
                         }
                         None => true, // No previous runs, so schedule it
                     };
 
                     if should_schedule {
-                        info!("Scheduling job: {}", job.job_name);
+                        info!("Scheduler: Scheduling job: {}", job.job_name);
                         self.db
                             .create_job_run(job.job_id.clone(), "queued", "scheduler")
-                            .await?;
+                            .await
+                            .context(format!("Scheduler: Failed to create job run for job {}", job.job_id))?;
+                        info!("Scheduler: Job {} scheduled successfully.", job.job_name);
                     }
                 }
             }
