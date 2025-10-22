@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: orc_rust_ator_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/orc_rust_ator_db
+      - RUST_LOG=info
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    command: ./orc-rust-ator
+
+volumes:
+  postgres_data:

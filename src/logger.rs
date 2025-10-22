@@ -1,3 +1,9 @@
+//! Provides global logging setup for the application.
+//! 
+//! This module initializes the `tracing` subscriber with a custom formatter that includes
+//! timestamps, elapsed time, log level, and file information. It ensures that logging
+//! is configured consistently across the application.
+
 // In src/logger.rs
 
 use chrono::Local;
@@ -59,5 +65,5 @@ pub fn initialize_logger() {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "info".into()),
         )
-        .init();
+        .try_init().ok();
 }
