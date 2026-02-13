@@ -1,3 +1,15 @@
+/*
+ * File: src/lib.rs
+ * Description: Core library for the `orc-rust-ator` application.
+ * Author: Antigravity (AI Assistant)
+ * Created: 2026-02-13
+ * Last Modified: 2026-02-13
+ * 
+ * Changes:
+ * - 2026-02-13: Refactored database initialization to support SQLite.
+ * - 2026-02-13: Added file header and documentation comments.
+ */
+
 // In src/lib.rs
 
 //! Core library for the `orc-rust-ator` application.
@@ -10,29 +22,39 @@
 use anyhow::{Context, Result};
 use std::env;
 use tracing::info;
-use axum::{
-    routing::{get, post},
-    Router,
-};
+
+use axum::Router;
+
 use std::net::SocketAddr;
-use crate::api::handlers::{create_job, get_job, get_jobs, get_run, get_runs, health_check, run_job};
+
+
 
 // --- Module Declarations ---
+
 pub mod api;
 pub mod orchestrator;
 pub mod plugins;
 pub mod state;
+pub mod auth;
 pub mod worker;
+pub mod utils;
 pub mod logger;
+pub mod models;
+
 
 // --- Local Imports ---
-use crate::orchestrator::job_manager::JobManager;
+
 use crate::orchestrator::scheduler::Scheduler;
+
 use crate::orchestrator::worker_manager::WorkerManager;
 use crate::state::db::Db;
 
+
+
+use crate::api::grpc_service::MyJobService;
+use crate::api::grpc_service::proto::job_service_server::JobServiceServer;
+
 pub async fn run_app() -> Result<()> {
-    // Initialize logging
     logger::initialize_logger();
     print_banner();
     info!("orc-rust-ator application starting...");
@@ -41,30 +63,28 @@ pub async fn run_app() -> Result<()> {
     let db = Db::new(&database_url).await?;
     db.migrate().await?;
 
-    let job_manager = JobManager::new(db.clone());
     let scheduler = Scheduler::new(db.clone());
     let worker_manager = WorkerManager::new(db.clone());
 
-    // Start the scheduler and worker manager in the background
     tokio::spawn(async move { scheduler.run().await });
     tokio::spawn(async move { worker_manager.run().await });
 
-    // Build the API routes
-    let app = Router::new()
-        .route("/health", get(health_check))
-        .route("/jobs", post(create_job).get(get_jobs))
-        .route("/jobs/:job_id", get(get_job))
-        .route("/jobs/:job_id/run", post(run_job))
-        .route("/runs", get(get_runs))
-        .route("/runs/:run_id", get(get_run))
-        .with_state(db);
+    let rest_api = api::app(db.clone());
 
-    // Run the API server
+    let grpc_service = MyJobService { db: db.clone() };
+    let grpc_server = JobServiceServer::new(grpc_service);
+
+    let grpc_router = tonic::service::Routes::new(grpc_server).into_axum_router();
+
+    let app = Router::new()
+        .merge(rest_api)
+        .merge(grpc_router);
+
+
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-    info!("API server listening on {}", addr);
-    axum::serve(tokio::net::TcpListener::bind(&addr).await?, app)
-        .await
-        .context("API server failed to start")?;
+    info!("Server listening on {}", addr);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    axum::serve(listener, app).await.context("Server failed to start")?;
 
     Ok(())
 }

@@ -1,3 +1,14 @@
+/*
+ * File: src/logger.rs
+ * Description: Provides global logging setup for the application.
+ * Author: Antigravity (AI Assistant)
+ * Created: 2026-02-13
+ * Last Modified: 2026-02-13
+ * 
+ * Changes:
+ * - 2026-02-13: Added file header and documentation comments.
+ */
+
 //! Provides global logging setup for the application.
 //! 
 //! This module initializes the `tracing` subscriber with a custom formatter that includes

@@ -1,0 +1,18 @@
+{
+  "job_name": "space_station_location",
+  "description": "Track International Space Station location in real-time",
+  "schedule": "*/5 * * * *",
+  "is_active": true,
+  "tasks": [
+    {
+      "extractor_config": {
+        "type": "api",
+        "url": "http://api.open-notify.org/iss-now.json"
+      },
+      "loader_config": {
+        "type": "warehouse",
+        "target": "duckdb"
+      }
+    }
+  ]
+}

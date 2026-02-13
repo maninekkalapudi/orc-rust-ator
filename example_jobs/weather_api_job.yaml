@@ -1,0 +1,19 @@
+# Example Job: Weather Data from Open-Meteo API
+# This job pulls weather data from a free API and loads it into DuckDB
+
+job_name: "weather_data_ingestion"
+description: "Fetch current weather data from Open-Meteo API and store in DuckDB"
+schedule: "0 */6 * * *"  # Run every 6 hours
+is_active: true
+
+tasks:
+  - task_order: 1
+    extractor_config:
+      type: "api"
+      url: "https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation&timezone=America/New_York"
+      method: "GET"
+      headers: {}
+    loader_config:
+      type: "warehouse"
+      target: "duckdb"
+      table_name: "weather_data"

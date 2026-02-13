@@ -1,3 +1,15 @@
+/*
+ * File: src/orchestrator/worker_manager.rs
+ * Description: Manages worker processes and the execution of individual job runs.
+ * Author: Antigravity (AI Assistant)
+ * Created: 2026-02-13
+ * Last Modified: 2026-02-13
+ * 
+ * Changes:
+ * - 2026-02-13: Reduced polling interval for better responsiveness.
+ * - 2026-02-13: Added file header and documentation comments.
+ */
+
 //! Manages worker processes and the execution of individual job runs.
 //! 
 //! This module provides the `WorkerManager` struct, which periodically polls the database
@@ -15,10 +27,13 @@ pub struct WorkerManager {
 }
 
 impl WorkerManager {
+    /// Creates a new `WorkerManager` with the given database handle.
     pub fn new(db: Db) -> Self {
         Self { db }
     }
 
+    /// Starts the worker manager loop. It polls the database for queued job runs
+    /// and spawns a worker task for each one found.
     pub async fn run(&self) -> Result<()> {
         info!("WorkerManager started.");
         loop {
@@ -45,7 +60,7 @@ impl WorkerManager {
                 });
             }
 
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::from_secs(1)).await;
         }
     }
 }

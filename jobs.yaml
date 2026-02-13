@@ -17,7 +17,7 @@
       loader_config:
         # Corresponds to the `DuckDB` variant in your `LoaderConfig` enum
         type: "duckdb"
-        db_path: "data_warehouse.db" # The final destination for your data
+        db_path: "warehouse/data_warehouse.db" # The final destination for your data
         table_name: "raw_api_posts"
 
 - # --- Job 2: A manually triggered job to process a local file ---

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package orc_rust_ator;
+
+service JobService {
+  rpc GetJobs (GetJobsRequest) returns (GetJobsResponse);
+  rpc GetJob (GetJobRequest) returns (GetJobResponse);
+  rpc CreateJob (CreateJobRequest) returns (CreateJobResponse);
+}
+
+message GetJobsRequest {}
+
+message GetJobsResponse {
+  repeated Job jobs = 1;
+}
+
+message GetJobRequest {
+  string job_id = 1;
+}
+
+message GetJobResponse {
+  Job job = 1;
+}
+
+message CreateJobRequest {
+  string job_name = 1;
+  string description = 2; // Optional, so just string is fine
+  string schedule = 3;
+  bool is_active = 4;
+}
+
+message CreateJobResponse {
+  Job job = 1;
+}
+
+message Job {
+  string job_id = 1;
+  string job_name = 2;
+  string description = 3;
+  string schedule = 4;
+  bool is_active = 5;
+}

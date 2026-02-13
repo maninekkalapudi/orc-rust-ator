@@ -1,3 +1,14 @@
+/*
+ * File: src/api/handlers.rs
+ * Description: Defines the API endpoint handlers for job management and monitoring.
+ * Author: Antigravity (AI Assistant)
+ * Created: 2026-02-13
+ * Last Modified: 2026-02-13
+ * 
+ * Changes:
+ * - 2026-02-13: Added file header and documentation comments.
+ */
+
 // In src/api/handlers.rs
 
 //! Defines the API endpoint handlers for job management and monitoring.
@@ -14,6 +25,7 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::Value;
+use uuid::Uuid;
 
 use tracing::{info, error}; // Added tracing imports
 
@@ -81,11 +93,11 @@ pub async fn get_jobs(State(db): State<Db>) -> Result<Json<Value>, StatusCode> {
     Ok(Json(serde_json::to_value(jobs).unwrap()))
 }
 
-pub async fn get_job(State(db): State<Db>, Path(job_id): Path<String>) -> Result<Json<Value>, StatusCode> {
+pub async fn get_job(State(db): State<Db>, Path(job_id): Path<Uuid>) -> Result<Json<Value>, StatusCode> {
     info!("Received request to get job: {}", job_id);
     let job_manager = JobManager::new(db);
     let job = job_manager
-        .get_job(job_id.clone()) // Clone job_id for logging
+        .get_job(job_id)
         .await
         .map_err(|e| {
             error!("Failed to get job {}: {:?}", job_id, e);
@@ -95,9 +107,9 @@ pub async fn get_job(State(db): State<Db>, Path(job_id): Path<String>) -> Result
     Ok(Json(serde_json::to_value(job).unwrap()))
 }
 
-pub async fn run_job(State(db): State<Db>, Path(job_id): Path<String>) -> Result<StatusCode, StatusCode> {
+pub async fn run_job(State(db): State<Db>, Path(job_id): Path<Uuid>) -> Result<StatusCode, StatusCode> {
     info!("Received request to run job: {}", job_id);
-    db.create_job_run(job_id.clone(), "queued", "manual") // Clone job_id for logging
+    db.create_job_run(job_id, "queued", "manual")
         .await
         .map_err(|e| {
             error!("Failed to run job {}: {:?}", job_id, e);
@@ -123,10 +135,10 @@ pub async fn get_runs(State(db): State<Db>) -> Result<Json<Value>, StatusCode> {
     Ok(Json(serde_json::to_value(runs).unwrap()))
 }
 
-pub async fn get_run(State(db): State<Db>, Path(run_id): Path<String>) -> Result<Json<Value>, StatusCode> {
+pub async fn get_run(State(db): State<Db>, Path(run_id): Path<Uuid>) -> Result<Json<Value>, StatusCode> {
     info!("Received request to get job run: {}", run_id);
     let run = db
-        .get_job_run(run_id.clone()) // Clone run_id for logging
+        .get_job_run(run_id)
         .await
         .map_err(|e| {
             error!("Failed to get job run {}: {:?}", run_id, e);

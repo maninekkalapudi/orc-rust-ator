@@ -34,7 +34,7 @@ reqwest = { version = "0.12.5", features = ["json"] }
 uuid = { version = "1.8.0", features = ["v4", "v7", "serde"] }
 
 # --- Web Framework (for API) ---
-axum = "0.7.5"
+axum = "0.8"
 tower-http = { version = "0.5.2", features = ["cors", "trace"] }
 
 
@@ -46,7 +46,7 @@ cron = "0.12.1"
 chrono = { version = "=0.4.39", features = ["serde"] }
 
 # --- State Store ---
-sqlx = { version = "0.7.4", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
+sqlx = { version = "0.7.4", features = ["runtime-tokio", "postgres", "sqlite", "uuid", "chrono", "json", "migrate"] }
 
 # Error Handling
 anyhow = "1.0.86"
@@ -61,5 +61,19 @@ duckdb = { version = "0.10.2", features = ["bundled", "appender-arrow"] }
 
 # Tempfile
 tempfile = "3.20.0"
+serde_yaml = "0.9.34"
+clap = { version = "4.5.57", features = ["derive"] }
+bcrypt = "0.18.0"
+jsonwebtoken = "10.3.0"
+axum-extra = { version = "0.12", features = ["typed-header"] }
+tonic = { version = "0.14.3", features = ["transport", "codegen", "router"] }
+prost = "0.14.3"
+prost-types = "0.14.3"
+tonic-prost = "0.14.3"
 
 [dev-dependencies]
+
+[build-dependencies]
+protoc-bin-vendored = "3.2.0"
+tonic-build = { version = "0.14.3", features = ["transport"] }
+tonic-prost-build = "0.14.3"

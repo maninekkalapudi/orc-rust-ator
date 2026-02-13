@@ -1,4 +1,14 @@
-// In src/orchestrator/job_manager.rs
+/*
+ * File: src/orchestrator/job_manager.rs
+ * Description: Manages job definitions and their associated tasks.
+ * Author: Antigravity (AI Assistant)
+ * Created: 2026-02-13
+ * Last Modified: 2026-02-13
+ * 
+ * Changes:
+ * - 2026-02-13: Added in-memory SQLite support for unit testing.
+ * - 2026-02-13: Added file header and documentation comments.
+ */
 
 //! Manages job definitions and their associated tasks.
 //! 
@@ -8,18 +18,22 @@
 use crate::state::db::{Db, JobDefinition, TaskDefinition};
 use anyhow::{Context, Result};
 use serde_json::Value;
+use uuid::Uuid;
 
-use tracing::{info, error}; // Added tracing imports
+use tracing::info;
 
 pub struct JobManager {
     db: Db,
 }
 
 impl JobManager {
+    /// Creates a new `JobManager` with the given database handle.
     pub fn new(db: Db) -> Self {
         Self { db }
     }
 
+    /// Creates a new job definition and its associated tasks in the database.
+    /// This is an atomic operation within the database (implicitly or explicitly handled by Db).
     pub async fn create_job(
         &self,
         job_name: &str,
@@ -41,7 +55,7 @@ impl JobManager {
             info!("JobManager: Creating task {} for job '{}'", i + 1, job.job_id);
             self.db
                 .create_task_definition(
-                    job.job_id.clone(),
+                    job.job_id,
                     i as i32 + 1,
                     &task.extractor_config,
                     &task.loader_config,
@@ -55,18 +69,20 @@ impl JobManager {
         Ok(job)
     }
 
-    pub async fn get_job(&self, job_id: String) -> Result<Option<(JobDefinition, Vec<TaskDefinition>)>> {
+    /// Retrieves a job definition and all its associated tasks by job ID.
+    pub async fn get_job(&self, job_id: Uuid) -> Result<Option<(JobDefinition, Vec<TaskDefinition>)>> {
         info!("JobManager: Attempting to retrieve job with ID: {}", job_id);
-        if let Some(job) = self.db.get_job_definition(job_id.clone()).await.context(format!("Failed to get job definition for ID: {}", job_id))? {
+        if let Some(job) = self.db.get_job_definition(job_id).await.context(format!("Failed to get job definition for ID: {}", job_id))? {
             info!("JobManager: Job with ID {} found. Retrieving tasks.", job_id);
-            let tasks = self.db.get_task_definitions_for_job(job.job_id.clone()).await.context(format!("Failed to get task definitions for job ID: {}", job_id))?;
+            let tasks = self.db.get_task_definitions_for_job(job.job_id).await.context(format!("Failed to get task definitions for job ID: {}", job_id))?;
             info!("JobManager: Successfully retrieved job {} and its tasks.", job_id);
             Ok(Some((job, tasks)))
         } else {
             info!("JobManager: Job with ID {} not found.", job_id);
             Ok(None)
         }
-    }}
+    }
+}
 
 pub struct NewTask {
     pub extractor_config: Value,
@@ -78,11 +94,9 @@ mod tests {
     use super::*;
     use crate::state::db::Db;
     use serde_json::json;
-    use std::env;
 
     async fn setup() -> Db {
-        let database_url = "postgresql://postgres:password@localhost:5432/test_db";
-        env::set_var("TEST_DATABASE_URL", database_url);
+        let database_url = "sqlite::memory:";
         let db = Db::new(database_url).await.unwrap();
         db.migrate().await.unwrap();
         db
@@ -103,7 +117,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (retrieved_job, retrieved_tasks) = job_manager.get_job(job.job_id.clone()).await.unwrap().unwrap();
+        let (retrieved_job, retrieved_tasks) = job_manager.get_job(job.job_id).await.unwrap().unwrap();
 
         assert_eq!(job.job_id, retrieved_job.job_id);
         assert_eq!(job.job_name, retrieved_job.job_name);
